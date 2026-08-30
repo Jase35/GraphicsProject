@@ -11,6 +11,7 @@ namespace engine{
             throw std::runtime_error("Failed to initialize window.");
         }
         glfwMakeContextCurrent(glfwWindow);
+        glfwSwapInterval(0);
     }
 
     Window::~Window(){

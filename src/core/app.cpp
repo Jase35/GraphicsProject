@@ -64,38 +64,58 @@ namespace engine{
 
     void App::loadScene(){
         scene.clear();
+        resources.clear();
 
         // TODO maybe change to be dynamic. In the mean time, nothing above here should be touched.
+
+        Handle<Mesh> mesh = resources.meshes.add(asset_loading::importMesh_fromFirstGLB(
+            std::filesystem::current_path() / "res" / "models" / "miku.glb"
+        ));
+
+        Handle<Shader> shader = resources.shaders.add(Shader(
+            std::filesystem::current_path() / "res" / "shaders" / "basic.vert",
+            std::filesystem::current_path() / "res" / "shaders" / "basic.frag"
+        ));
 
         scene.firstRoot = scene.registry.create();
         GameObject& firstGameObject = scene.registry.emplace<GameObject>(scene.firstRoot, "Camera");
         scene.registry.emplace<Camera>(scene.firstRoot);
         firstGameObject.position = vec3(0.0f, 0.0f, 1.0f); // May need to make positive.
 
-        std::filesystem::path path = std::filesystem::current_path() / "res" / "models" / "miku.glb";
-        entt::entity secondEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
+        //entt::entity secondEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
+        entt::entity secondEntity = scene.registry.create();
+        GameObject& secondGameObject = scene.registry.emplace<GameObject>(secondEntity, "Second");
+        scene.registry.emplace<Renderer>(secondEntity, mesh, shader);
         game_object_system::setParent(scene, secondEntity, entt::null);
-        GameObject& secondGameObject = scene.registry.get<GameObject>(secondEntity);
         secondGameObject.scale = vec3(0.01f);
         secondGameObject.position = vec3(0.0f, 0.0f, -5.0f);
         secondGameObject.rotation.x = 1.57f;
 
-        entt::entity thirdEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
+        size_t ITERATIONS = 1000;
+        for(size_t i = 0; i < ITERATIONS; i++){
+            entt::entity newEntity = scene.registry.create();
+            GameObject& newGameObject = scene.registry.emplace<GameObject>(newEntity, "New");
+            scene.registry.emplace<Renderer>(newEntity, mesh, shader);
+            game_object_system::setParent(scene, newEntity, entt::null);
+            newGameObject.scale = vec3(0.0075f);
+            newGameObject.position = vec3(0.0f, 0.0f, -5.0f);
+            //newGameObject.rotation.x = 1.57f;
+            newGameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;
+        }
+
+        //entt::entity thirdEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
+        entt::entity thirdEntity = scene.registry.create();
+        GameObject& thirdGameObject = scene.registry.emplace<GameObject>(thirdEntity, "Third");
+        scene.registry.emplace<Renderer>(thirdEntity, mesh, shader);
         game_object_system::setParent(scene, thirdEntity, secondEntity);
-        GameObject& thirdGameObject = scene.registry.get<GameObject>(thirdEntity);
         thirdGameObject.scale = vec3(0.5f);
         thirdGameObject.position = vec3(1.0f, 0.0f, 0.0f);
-
-        render_system::tempShader = render_system::loadShader(
-            std::filesystem::current_path() / "res" / "shaders" / "basic.vert",
-            std::filesystem::current_path() / "res" / "shaders" / "basic.frag"
-        );
     }
 
     void App::update(float deltaTime){
         game_object_system::debugUpdate(scene.registry, deltaTime);
-        game_object_system::prerender(scene, scene.firstRoot, mat4(1.0f)); // Pass in identity.
+        game_object_system::prerender(scene);
 
-        render_system::render(scene.registry, window.getAspectRatio());
+        render_system::render(scene, resources.meshes, resources.shaders, window.getAspectRatio());
     }
 }

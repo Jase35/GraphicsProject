@@ -1,80 +1,23 @@
 #include "renderer.hpp"
 
+#include "core/ecs_manager.hpp"
+
 namespace engine{
 
-    Renderer::Renderer(const Mesh& mesh) : mesh(mesh) {
-        glGenVertexArrays(1, &vao); // Do before vbo.
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-        // Change to GL_DYNAMIC if the vertices are modifies a lot.
-        glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex), mesh.vertices.data(), GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(uint32_t), mesh.indices.data(), GL_STATIC_DRAW);
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-        glEnableVertexAttribArray(0);
-
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-        glEnableVertexAttribArray(1);
-
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, textureUV));
-        glEnableVertexAttribArray(2);
-
-        glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, boneIndices));
-        glEnableVertexAttribArray(3);
-
-        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, boneWeights));
-        glEnableVertexAttribArray(4);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+    Renderer::Renderer(Handle<Mesh> mesh, Handle<Shader> shader) : mesh(mesh), shader(shader) {
+        // TODO rebuild render batching.
     }
-
-    Renderer::Renderer() : Renderer(Mesh::testMesh()) {}
 
     Renderer::~Renderer(){
         // TODO
     }
 
     namespace render_system{
-        GLuint loadShader(
-            const std::filesystem::path& vertPath,
-            const std::filesystem::path& fragPath
-        ){
-            std::string vertexShaderSource = render_system::readFile(vertPath);
-            std::string fragmentShaderSource = render_system::readFile(fragPath);
-
-            const GLchar* vertexShaderCode = vertexShaderSource.c_str();
-            const GLchar* fragmentShaderCode = fragmentShaderSource.c_str();
-            
-            GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-            glShaderSource(vertexShader, 1, &vertexShaderCode, NULL);
-            glCompileShader(vertexShader);
-
-            GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-            glShaderSource(fragmentShader, 1, &fragmentShaderCode, NULL);
-            glCompileShader(fragmentShader);
-
-            GLuint shaderProgram = glCreateProgram();
-            glAttachShader(shaderProgram, vertexShader);
-            glAttachShader(shaderProgram, fragmentShader);
-            glLinkProgram(shaderProgram);
-
-            glDeleteShader(vertexShader);
-            glDeleteShader(fragmentShader);
-
-            return shaderProgram;
-        }
-
-        void render(entt::registry& registry, const float& aspectRatio){
+        void render(Scene& scene, ResourcePool<Mesh>& meshes, ResourcePool<Shader>& shaders, const float& aspectRatio){
             mat4 viewMatrix = mat4(1.0f);
             mat4 projectionMatrix = mat4(1.0f);
             bool found = false;
-            for(auto [entity, camera, gameObject] : registry.view<Camera, GameObject>().each()){
+            for(auto [entity, camera, gameObject] : scene.registry.view<Camera, GameObject>().each()){
                 if(gameObject.active){ // TODO change condition.
 
                     viewMatrix = inverse(gameObject.globalTransform);
@@ -112,47 +55,132 @@ namespace engine{
                 return;
             }
 
-            GLuint shaderProgram = tempShader; // TODO change.
-            glUseProgram(shaderProgram);
+            static GLuint cameraUBO = 0;
+            static GLuint bonesSSBO = 0;
+            static GLuint instancesSSBO = 0;
+            static size_t instanceCapacity = 0;
+            if(cameraUBO == 0){
+                glGenBuffers(1, &cameraUBO);
+                glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
+                glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(mat4), NULL, GL_DYNAMIC_DRAW);
 
-            GLint viewLocation = glGetUniformLocation(shaderProgram, "view");
-            glUniformMatrix4fv(viewLocation, 1, GL_FALSE, value_ptr(viewMatrix));
+                glGenBuffers(1, &bonesSSBO);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, bonesSSBO);
+                glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_BONES * sizeof(mat4), NULL, GL_DYNAMIC_DRAW);
 
-            GLint projectionLocation = glGetUniformLocation(shaderProgram, "projection");
-            glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, value_ptr(projectionMatrix));
+                glGenBuffers(1, &instancesSSBO);
+            }
+            const mat4 cameraMatrices[2] = { viewMatrix, projectionMatrix };
 
-            mat4 boneMatrices[128]; // TODO
+            glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(cameraMatrices), cameraMatrices);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, cameraUBO);
 
-            GLuint bonesSSBO;
-            glGenBuffers(1, &bonesSSBO);
+            std::array<mat4, MAX_BONES> boneMatrices;
+            boneMatrices.fill(mat4(1.0f));
+
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, bonesSSBO);
-            glBufferData(
-                GL_SHADER_STORAGE_BUFFER,
-                sizeof(boneMatrices),
-                boneMatrices,
-                GL_DYNAMIC_DRAW
-            );
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, bonesSSBO);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, boneMatrices.size() * sizeof(mat4), boneMatrices.data());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bonesSSBO);
 
-            for(auto [entity, renderer, gameObject] : registry.view<const Renderer, const GameObject>().each()){
-                GLint modelMatrixLocation = glGetUniformLocation(shaderProgram, "modelMatrix");
+            /*for(auto [entity, renderer, gameObject] : registry.view<const Renderer, const GameObject>().each()){
+                Mesh* mesh = meshes.get(renderer.mesh);
+                Shader* shader = shaders.get(renderer.shader);
+                if(mesh == nullptr || shader == nullptr){
+                    continue;
+                }
+                
+                shader->bind();
+
+                GLint modelMatrixLocation = glGetUniformLocation(shader->shaderId, "modelMatrix");
                 glUniformMatrix4fv(modelMatrixLocation, 1, GL_FALSE, value_ptr(gameObject.globalTransform));
 
-                GLint normalMatrixLocation = glGetUniformLocation(shaderProgram, "normalMatrix");
+                GLint normalMatrixLocation = glGetUniformLocation(shader->shaderId, "normalMatrix");
                 mat3 normalMatrix = mat3(transpose(inverse(gameObject.globalTransform)));
                 glUniformMatrix3fv(normalMatrixLocation, 1, GL_FALSE, value_ptr(normalMatrix));
 
-                glBindVertexArray(renderer.vao);
-                glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(renderer.mesh.indices.size()), GL_UNSIGNED_INT, 0);
-            }
-        }
+                mesh->bind();
+                glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh->indices.size()), GL_UNSIGNED_INT, 0);
+            }*/
 
-        std::string readFile(const std::filesystem::path& path){
-            std::ifstream f(path.string(), std::ios::in | std::ios::binary);
-            if(!f) throw std::runtime_error("Failed to open " + path.string());
-            std::ostringstream ss;
-            ss << f.rdbuf();
-            return ss.str();
+            // Around 180 TPS with 1,000 Mikus prior to batching.
+
+            std::sort(
+                scene.renderList.begin(),
+                scene.renderList.end(),
+                [](auto& a, auto& b) { return a.key < b.key; }
+            );
+
+            static std::vector<InstanceData> instancesData;
+
+            uint16_t lastShaderId = 0xFFFF, lastMaterialId = 0xFFFF, lastMeshId = 0xFFFF;
+            GLsizei indicesSize = 0;
+            for(size_t begin = 0; begin < scene.renderList.size();){
+                const uint64_t batchKey = scene.renderList[begin].key >> 8;
+                size_t end = begin;
+                while(end < scene.renderList.size() && (scene.renderList[end].key >> 8) == batchKey){
+                    end++;
+                }
+
+                //uint16_t layerId = static_cast<uint16_t>(scene.renderList[begin].key >> 56);
+                uint16_t shaderId = static_cast<uint16_t>(scene.renderList[begin].key >> 40);
+                uint16_t materialId = static_cast<uint16_t>(scene.renderList[begin].key >> 24);
+                uint16_t meshId = static_cast<uint16_t>(scene.renderList[begin].key >> 8);
+
+                if(shaderId != lastShaderId){
+                    Shader* shader = shaders.get(shaderId);
+                    if(shader == nullptr){
+                        begin = end;
+                        continue;
+                    }
+                    shader->bind();
+
+                    lastShaderId = shaderId;
+                }
+
+                if(materialId != lastMaterialId){
+                    // TODO
+                    lastMaterialId = materialId;
+                }
+
+                if(meshId != lastMeshId){
+                    Mesh* mesh = meshes.get(meshId);
+                    if(mesh == nullptr){
+                        begin = end;
+                        continue;
+                    }
+                    mesh->bind();
+
+                    indicesSize = static_cast<GLsizei>(mesh->indices.size());
+
+                    lastMeshId = meshId;
+                }
+
+                instancesData.clear();
+                instancesData.reserve(end - begin);
+                for(size_t i = begin; i < end; i++){
+                    const mat4& transform = scene.renderList[i].transform;
+                    instancesData.push_back({ transform, transpose(inverse(transform)) });
+                }
+
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesSSBO);
+                if(instancesData.size() > instanceCapacity){
+                    instanceCapacity = instancesData.size();
+                    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCapacity * sizeof(InstanceData), NULL, GL_DYNAMIC_DRAW);
+                }
+                glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesData.size() * sizeof(InstanceData), instancesData.data());
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, instancesSSBO);
+
+                glDrawElementsInstanced(
+                    GL_TRIANGLES,
+                    indicesSize,
+                    GL_UNSIGNED_INT,
+                    nullptr,
+                    static_cast<GLsizei>(instancesData.size())
+                );
+
+                begin = end;
+            }
         }
     }
 }

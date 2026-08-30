@@ -16,7 +16,5 @@ using namespace engine;
 
 namespace asset_loading{
     entt::entity importRootEntity_fromWholeGLB(Scene& scene, const std::filesystem::path& path);
-    engine::Mesh importMesh_fromFirstGLB(entt::registry& registry, const std::filesystem::path& path);
-
-    engine::Mesh toMesh(const fastgltf::Asset& asset, const fastgltf::Primitive& prim);
+    Mesh importMesh_fromFirstGLB(const std::filesystem::path& path);
 }

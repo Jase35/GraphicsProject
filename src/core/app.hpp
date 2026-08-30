@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <deque>
 #include <filesystem>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -30,6 +31,7 @@ namespace engine{
         std::string appName;
         bool devMode;
         Scene scene;
+        Resources resources;
         //entt::registry registry;
         //entt::entity firstRoot = entt::null; // First among equals (in depth).
         Window window{"Starting...", DEFAULT_WIDTH, DEFAULT_HEIGHT};

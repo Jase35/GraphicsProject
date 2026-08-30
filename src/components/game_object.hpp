@@ -2,6 +2,7 @@
 
 #include <entt/entt.hpp>
 #include <cmath>
+#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -28,9 +29,11 @@ namespace engine{
     };
 
     namespace game_object_system{
+        void destroy(Scene& scene, entt::entity gameObject);
         void setParent(Scene& scene, entt::entity child, entt::entity parent);
 
         void debugUpdate(entt::registry& registry, const float& deltaTime);
+        void prerender(Scene& scene);
         void prerender(Scene& scene, entt::entity entity, const mat4& ancestorTransform);
 
         mat4 getLocalTranform(const vec3& position, const vec3& rotation, const vec3& scale);

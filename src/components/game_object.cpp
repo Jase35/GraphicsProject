@@ -7,6 +7,11 @@ namespace engine{
     GameObject::GameObject(std::string name) : name(name) {}
 
     namespace game_object_system{
+        void destroy(Scene& scene, entt::entity entity){
+            setParent(scene, entity, entt::null);
+            scene.registry.destroy(entity);
+        }
+
         void setParent(Scene& scene, entt::entity child, entt::entity parent){
             if(child == entt::null || child == parent || child == scene.firstRoot){
                 return;
@@ -60,17 +65,39 @@ namespace engine{
             }
         }
 
+        void prerender(Scene& scene){
+            scene.renderList.clear();
+            prerender(scene, scene.firstRoot, mat4(1.0f)); // Pass in identity.
+        }
+
         void prerender(Scene& scene, entt::entity entity, const mat4& ancestorTransform){
             while(entity != entt::null){
                 GameObject& gameObject = scene.registry.get<GameObject>(entity);
 
-                gameObject.globalTransform = ancestorTransform * getLocalTranform(
-                    gameObject.position,
-                    gameObject.rotation,
-                    gameObject.scale
-                );
+                if(gameObject.active){
+                    mat4 transform = ancestorTransform * getLocalTranform(
+                        gameObject.position,
+                        gameObject.rotation,
+                        gameObject.scale
+                    );
 
-                prerender(scene, gameObject.firstChild, gameObject.globalTransform);
+                    gameObject.globalTransform = transform;
+
+                    if(const Renderer* renderer = scene.registry.try_get<Renderer>(entity)){
+                        RenderItem item;
+                        item.entity = entity;
+                        item.key = (static_cast<uint64_t>(renderer->layer) << 56) |
+                            (static_cast<uint64_t>(renderer->shader.index) << 40) |
+                            (static_cast<uint64_t>(0) << 24) | // TODO implement material
+                            (static_cast<uint64_t>(renderer->mesh.index) << 8) |
+                            (static_cast<uint64_t>(0)); // Might be useful later; IDK.
+                        item.transform = transform;
+                        scene.renderList.push_back(item);
+                    }
+
+                    prerender(scene, gameObject.firstChild, transform);
+                }
+
                 entity = gameObject.nextSibling;
             }
         }

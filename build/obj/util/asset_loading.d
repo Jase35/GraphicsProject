@@ -8,7 +8,8 @@ build/obj/util/asset_loading.o: src/util/asset_loading.cpp \
  src/core/ecs_manager.hpp libs/entt-main/single_include/entt/entt.hpp \
  src/components/game_object.hpp src/components/camera.hpp \
  src/components/renderer.hpp include/glad/gl.h include/KHR/khrplatform.h \
- src/composites/mesh.hpp src/composites/vertex.hpp
+ src/composites/mesh.hpp src/composites/vertex.hpp \
+ src/composites/shader.hpp src/util/resource_pool.hpp
 src/util/asset_loading.hpp:
 libs/fastgltf-main/include/fastgltf/core.hpp:
 libs/fastgltf-main/include/fastgltf/types.hpp:
@@ -25,3 +26,5 @@ include/glad/gl.h:
 include/KHR/khrplatform.h:
 src/composites/mesh.hpp:
 src/composites/vertex.hpp:
+src/composites/shader.hpp:
+src/util/resource_pool.hpp:

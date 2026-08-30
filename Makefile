@@ -20,13 +20,13 @@ INC_DIRS := $(INC_DIR) \
             $(LIB_DIR)/imgui-master \
             $(LIB_DIR)/imgui-master/backends
 CPPFLAGS := $(addprefix -I,$(INC_DIRS)) -MMD -MP -DGLFW_INCLUDE_NONE
-CXXFLAGS := -std=c++17 $(WARN)
+CXXFLAGS := -std=c++20 $(WARN)
 CFLAGS   := -std=c17 -Wall
 LDFLAGS  :=
 
 LDLIBS   := -lglfw3 -lopengl32 -lgdi32 -lsimdjson
 
-BUILD_TYPE ?= debug
+BUILD_TYPE ?= release
 
 ifeq ($(BUILD_TYPE),release)
   OPT      := -O2 -DNDEBUG
@@ -81,7 +81,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 $(OBJ_DIR)/libs/%.o: $(LIB_DIR)/%.cpp | $(OBJ_DIR)
 	@$(call MKDIR,$(dir $@))
-	$(CXX) $(CPPFLAGS) -std=c++17 $(OPT) -c $< -o $@
+	$(CXX) $(CPPFLAGS) -std=c++20 $(OPT) -c $< -o $@
 
 $(BUILD_DIR) $(OBJ_DIR):
 	@$(call MKDIR,$@)
