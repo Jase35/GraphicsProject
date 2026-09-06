@@ -22,16 +22,16 @@ namespace engine{
         static constexpr int DEFAULT_WIDTH = 1280;
         static constexpr int DEFAULT_HEIGHT = 720;
         static constexpr float MAX_FRAME_TIME = 0.5f;
-        App(std::string appName, const bool devMode);
+        App(std::string appName, const bool editorOpen, const bool titleDebug);
         int run();
         void update(float deltaTime);
         void loadScene();
 
         private:
         std::string appName;
-        bool devMode;
+        bool editorOpen;
+        bool titleDebug;
         Scene scene;
-        Resources resources;
         //entt::registry registry;
         //entt::entity firstRoot = entt::null; // First among equals (in depth).
         Window window{"Starting...", DEFAULT_WIDTH, DEFAULT_HEIGHT};

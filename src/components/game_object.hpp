@@ -30,6 +30,7 @@ namespace engine{
 
     namespace game_object_system{
         void destroy(Scene& scene, entt::entity gameObject);
+        void setParent(entt::registry& registry, entt::entity firstRoot, entt::entity child, entt::entity parent);
         void setParent(Scene& scene, entt::entity child, entt::entity parent);
 
         void debugUpdate(entt::registry& registry, const float& deltaTime);

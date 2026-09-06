@@ -17,9 +17,14 @@ namespace engine{
 
         ~Shader();
 
+        Shader(const Shader&) = delete;
+        Shader& operator=(const Shader&) = delete;
+        Shader(Shader&& other) noexcept;
+        Shader& operator=(Shader&& other) noexcept;
+
         std::string readFile(const std::filesystem::path& path);
 
-        GLuint shaderId;
+        GLuint shaderGLId = 0;
 
         void bind() const;
     };

@@ -4,7 +4,7 @@ namespace engine{
     Mesh::Mesh(
         const std::vector<Vertex>& vertices,
         const std::vector<uint32_t>& indices
-    ) : vertices(vertices), indices(indices) {
+    ) : vertices(vertices), indices(indices), indexCount(static_cast<GLsizei>(indices.size())) {
         glGenVertexArrays(1, &vao); // Do before vbo.
         glGenBuffers(1, &vbo);
         glGenBuffers(1, &ebo);
@@ -37,73 +37,47 @@ namespace engine{
     }
 
     Mesh::~Mesh(){
-        // TODO
+        glDeleteVertexArrays(1, &vao);
+        glDeleteBuffers(1, &vbo);
+        glDeleteBuffers(1, &ebo);
+    }
+
+    Mesh::Mesh(Mesh&& other) noexcept : 
+        vertices(std::move(other.vertices)),
+        indices(std::move(other.indices)),
+        indexCount(other.indexCount),
+        vao(other.vao),
+        vbo(other.vbo),
+        ebo(other.ebo)
+    {
+        other.indexCount = 0;
+        other.vao = 0;
+        other.vbo = 0;
+        other.ebo = 0;
+    }
+
+    Mesh& Mesh::operator=(Mesh&& other) noexcept{
+        if(this != &other){
+            glDeleteVertexArrays(1, &vao);
+            glDeleteBuffers(1, &vbo);
+            glDeleteBuffers(1, &ebo);
+
+            vertices = std::move(other.vertices);
+            indices = std::move(other.indices);
+            indexCount = other.indexCount;
+            vao = other.vao;
+            vbo = other.vbo;
+            ebo = other.ebo;
+
+            other.indexCount = 0;
+            other.vao = 0;
+            other.vbo = 0;
+            other.ebo = 0;
+        }
+        return *this;
     }
 
     void Mesh::bind() const{
         glBindVertexArray(vao);
     }
-
-    /*Mesh Mesh::testMesh(){
-        Mesh mesh;
-
-        mesh.vertices.push_back(Vertex(vec3(0.25f, 0.25f, 0.25f)));    // A
-        mesh.vertices.push_back(Vertex(vec3(-0.25f, 0.25f, 0.25f)));   // B
-        mesh.vertices.push_back(Vertex(vec3(0.25f, -0.25f, 0.25f)));   // C
-        mesh.vertices.push_back(Vertex(vec3(-0.25f, -0.25f, 0.25f)));  // D
-        mesh.vertices.push_back(Vertex(vec3(0.25f, 0.25f, -0.25f)));   // E
-        mesh.vertices.push_back(Vertex(vec3(-0.25f, 0.25f, -0.25f)));  // F
-        mesh.vertices.push_back(Vertex(vec3(0.25f, -0.25f, -0.25f)));  // G
-        mesh.vertices.push_back(Vertex(vec3(-0.25f, -0.25f, -0.25f))); // H
-
-        mesh.indices.push_back(4);
-        mesh.indices.push_back(5);
-        mesh.indices.push_back(1);
-
-        mesh.indices.push_back(0);
-        mesh.indices.push_back(4);
-        mesh.indices.push_back(1);
-
-        mesh.indices.push_back(2);
-        mesh.indices.push_back(0);
-        mesh.indices.push_back(1);
-
-        mesh.indices.push_back(3);
-        mesh.indices.push_back(2);
-        mesh.indices.push_back(1);
-
-        mesh.indices.push_back(4);
-        mesh.indices.push_back(0);
-        mesh.indices.push_back(2);
-
-        mesh.indices.push_back(2);
-        mesh.indices.push_back(6);
-        mesh.indices.push_back(4);
-
-        mesh.indices.push_back(3);
-        mesh.indices.push_back(1);
-        mesh.indices.push_back(5);
-
-        mesh.indices.push_back(7);
-        mesh.indices.push_back(3);
-        mesh.indices.push_back(5);
-
-        mesh.indices.push_back(6);
-        mesh.indices.push_back(2);
-        mesh.indices.push_back(3);
-
-        mesh.indices.push_back(6);
-        mesh.indices.push_back(3);
-        mesh.indices.push_back(7);
-
-        mesh.indices.push_back(6);
-        mesh.indices.push_back(7);
-        mesh.indices.push_back(5);
-
-        mesh.indices.push_back(6);
-        mesh.indices.push_back(5);
-        mesh.indices.push_back(4);
-
-        return mesh;
-    }*/
 }

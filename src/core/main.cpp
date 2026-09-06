@@ -3,12 +3,16 @@
 using namespace engine;
 
 int main(int argc, char** argv){
-    bool devMode = false;
-    if(argc >= 2){
+    bool editorOpen = false;
+    bool titleDebug = false;
+    if(argc >= 3){
         if(strcmp(argv[1], "true") == 0){
-            devMode = true;
+            editorOpen = true;
+        }
+        if(strcmp(argv[2], "true") == 0){
+            titleDebug = true;
         }
     }
-    App app{"Graphics Program", devMode};
+    App app{"Graphics Program", editorOpen, titleDebug};
     return app.run();
 }

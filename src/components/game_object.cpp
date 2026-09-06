@@ -6,34 +6,29 @@ namespace engine{
 
     GameObject::GameObject(std::string name) : name(name) {}
 
-    namespace game_object_system{
-        void destroy(Scene& scene, entt::entity entity){
-            setParent(scene, entity, entt::null);
-            scene.registry.destroy(entity);
-        }
+    namespace{
+        void unlink(entt::registry& registry, entt::entity& firstRoot, entt::entity child){
+            GameObject& childObj = registry.get<GameObject>(child);
 
-        void setParent(Scene& scene, entt::entity child, entt::entity parent){
-            if(child == entt::null || child == parent || child == scene.firstRoot){
-                return;
-            }
-            
-            GameObject& childObj = scene.registry.get<GameObject>(child);
-
-            for(entt::entity ancestor = parent; ancestor != entt::null; ancestor = scene.registry.get<GameObject>(ancestor).parent){
-                if(ancestor == child){
-                    return;
+            if(childObj.parent != entt::null){
+                GameObject& parentObj = registry.get<GameObject>(childObj.parent);
+                if(parentObj.firstChild == child){
+                    parentObj.firstChild = childObj.nextSibling;
+                }else{
+                    for(entt::entity sibling = parentObj.firstChild; sibling != entt::null;){
+                        GameObject& siblingObj = registry.get<GameObject>(sibling);
+                        if(siblingObj.nextSibling == child){
+                            siblingObj.nextSibling = childObj.nextSibling;
+                            break;
+                        }
+                        sibling = siblingObj.nextSibling;
+                    }
                 }
-            }
-
-            entt::entity head = childObj.parent != entt::null 
-                ? scene.registry.get<GameObject>(childObj.parent).firstChild
-                : scene.firstRoot;
-
-            if(head == child){
-                scene.registry.get<GameObject>(childObj.parent).firstChild = childObj.nextSibling;
+            }else if(firstRoot == child){
+                firstRoot = childObj.nextSibling;
             }else{
-                for(entt::entity sibling = head; sibling != entt::null;){
-                    GameObject& siblingObj = scene.registry.get<GameObject>(sibling);
+                for(entt::entity sibling = firstRoot; sibling != entt::null;){
+                    GameObject& siblingObj = registry.get<GameObject>(sibling);
                     if(siblingObj.nextSibling == child){
                         siblingObj.nextSibling = childObj.nextSibling;
                         break;
@@ -44,17 +39,60 @@ namespace engine{
 
             childObj.parent = entt::null;
             childObj.nextSibling = entt::null;
+        }
+
+        void destroySubtree(Scene& scene, entt::entity entity){
+            while(entity != entt::null){
+                GameObject& gameObject = scene.registry.get<GameObject>(entity);
+                entt::entity next = gameObject.nextSibling;
+                destroySubtree(scene, gameObject.firstChild);
+                scene.registry.destroy(entity);
+                entity = next;
+            }
+        }
+    }
+
+    namespace game_object_system{
+        void destroy(Scene& scene, entt::entity entity){
+            if(entity == entt::null || !scene.registry.valid(entity)){
+                return;
+            }
+
+            unlink(scene.registry, scene.firstRoot, entity);
+
+            destroySubtree(scene, scene.registry.get<GameObject>(entity).firstChild);
+            scene.registry.destroy(entity);
+        }
+
+        void setParent(entt::registry& registry, entt::entity firstRoot, entt::entity child, entt::entity parent){
+            if(child == entt::null || child == parent || child == firstRoot){
+                return;
+            }
+            
+            GameObject& childObj = registry.get<GameObject>(child);
+
+            for(entt::entity ancestor = parent; ancestor != entt::null; ancestor = registry.get<GameObject>(ancestor).parent){
+                if(ancestor == child){
+                    return;
+                }
+            }
+
+            unlink(registry, firstRoot, child);
 
             if(parent != entt::null){
-                GameObject& parentObj = scene.registry.get<GameObject>(parent);
+                GameObject& parentObj = registry.get<GameObject>(parent);
                 childObj.nextSibling = parentObj.firstChild;
                 parentObj.firstChild = child;
                 childObj.parent = parent;
             }else{
-                GameObject& rootObj = scene.registry.get<GameObject>(scene.firstRoot);
+                GameObject& rootObj = registry.get<GameObject>(firstRoot);
                 childObj.nextSibling = rootObj.nextSibling;
                 rootObj.nextSibling = child;
             }
+        }
+
+        void setParent(Scene& scene, entt::entity child, entt::entity parent){
+            setParent(scene.registry, scene.firstRoot, child, parent);
         }
 
         void debugUpdate(entt::registry& registry, const float& deltaTime){
@@ -84,15 +122,18 @@ namespace engine{
                     gameObject.globalTransform = transform;
 
                     if(const Renderer* renderer = scene.registry.try_get<Renderer>(entity)){
-                        RenderItem item;
-                        item.entity = entity;
-                        item.key = (static_cast<uint64_t>(renderer->layer) << 56) |
-                            (static_cast<uint64_t>(renderer->shader.index) << 40) |
-                            (static_cast<uint64_t>(0) << 24) | // TODO implement material
-                            (static_cast<uint64_t>(renderer->mesh.index) << 8) |
-                            (static_cast<uint64_t>(0)); // Might be useful later; IDK.
-                        item.transform = transform;
-                        scene.renderList.push_back(item);
+                        const Material* material = scene.resources.materials.get(renderer->material);
+                        if(material != nullptr){
+                            scene.renderList.add(
+                                (static_cast<uint64_t>(renderer->layer) << 56) |
+                                    (static_cast<uint64_t>(material->shader.index) << 40) |
+                                    (static_cast<uint64_t>(renderer->material.index) << 24) | // TODO implement material
+                                    (static_cast<uint64_t>(renderer->mesh.index) << 8) |
+                                    (static_cast<uint64_t>(0)),
+                                entity,
+                                transform
+                            );
+                        }
                     }
 
                     prerender(scene, gameObject.firstChild, transform);

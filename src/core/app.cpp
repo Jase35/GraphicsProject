@@ -1,7 +1,7 @@
 #include "app.hpp"
 
 namespace engine{
-    App::App(std::string appName, const bool devMode) : appName(appName), devMode(devMode) {}
+    App::App(std::string appName, const bool editorOpen, const bool titleDebug) : appName(appName), editorOpen(editorOpen), titleDebug(titleDebug) {}
 
     int App::run(){
         if(!gladLoadGL((GLADloadfunc)glfwGetProcAddress)){
@@ -10,8 +10,11 @@ namespace engine{
         }
 
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
 
-        if(devMode){
+        if(editorOpen){
             editor::initialize(window);
         }
 
@@ -40,8 +43,11 @@ namespace engine{
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             update(deltaTime);
 
-            if(devMode){
+            if(editorOpen){
                 editor::update(scene);
+            }
+
+            if(titleDebug){
                 ticks++;
                 tickTimer += deltaTime;
                 if(tickTimer >= 1.0f){
@@ -54,27 +60,36 @@ namespace engine{
             window.swapBuffers();
         }
 
-        if(devMode){
+        if(editorOpen){
             editor::shutdown();
         }
 
-        glfwTerminate();
+        render_system::shutdown();
+        scene.clear();
+
         return 0;
     }
 
     void App::loadScene(){
-        scene.clear();
-        resources.clear();
+        scene = Scene{};
 
         // TODO maybe change to be dynamic. In the mean time, nothing above here should be touched.
 
-        Handle<Mesh> mesh = resources.meshes.add(asset_loading::importMesh_fromFirstGLB(
+        /*Handle<Mesh> mesh = scene.resources.meshes.add(asset_loading::importMesh_fromFirstGLB(
             std::filesystem::current_path() / "res" / "models" / "miku.glb"
-        ));
+        ));*/
 
-        Handle<Shader> shader = resources.shaders.add(Shader(
+        Handle<Shader> shader = scene.resources.shaders.add(Shader(
             std::filesystem::current_path() / "res" / "shaders" / "basic.vert",
             std::filesystem::current_path() / "res" / "shaders" / "basic.frag"
+        ));
+
+        //Handle<Material> material = scene.resources.materials.add(Material(shader, vec4(1.0f, 1.0f, 1.0f, 1.0f), true, 0));
+
+        Handle<Prefab> prefab = scene.resources.prefabs.add(asset_loading::importRootEntity_fromGLB(
+            std::filesystem::current_path() / "res" / "models" / "untitled.glb",
+            scene.resources,
+            shader
         ));
 
         scene.firstRoot = scene.registry.create();
@@ -83,39 +98,46 @@ namespace engine{
         firstGameObject.position = vec3(0.0f, 0.0f, 1.0f); // May need to make positive.
 
         //entt::entity secondEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
-        entt::entity secondEntity = scene.registry.create();
+        /*entt::entity secondEntity = scene.registry.create();
         GameObject& secondGameObject = scene.registry.emplace<GameObject>(secondEntity, "Second");
-        scene.registry.emplace<Renderer>(secondEntity, mesh, shader);
+        scene.registry.emplace<Renderer>(secondEntity, mesh, material);
         game_object_system::setParent(scene, secondEntity, entt::null);
         secondGameObject.scale = vec3(0.01f);
         secondGameObject.position = vec3(0.0f, 0.0f, -5.0f);
-        secondGameObject.rotation.x = 1.57f;
+        secondGameObject.rotation.x = 1.57f;*/
 
-        size_t ITERATIONS = 1000;
+        size_t ITERATIONS = 8;
+        Prefab* prefabResource = scene.resources.prefabs.get(prefab);
         for(size_t i = 0; i < ITERATIONS; i++){
-            entt::entity newEntity = scene.registry.create();
+            /*entt::entity newEntity = scene.registry.create();
             GameObject& newGameObject = scene.registry.emplace<GameObject>(newEntity, "New");
-            scene.registry.emplace<Renderer>(newEntity, mesh, shader);
+            scene.registry.emplace<Renderer>(newEntity, mesh, material, shader);
             game_object_system::setParent(scene, newEntity, entt::null);
             newGameObject.scale = vec3(0.0075f);
             newGameObject.position = vec3(0.0f, 0.0f, -5.0f);
-            //newGameObject.rotation.x = 1.57f;
-            newGameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;
+            newGameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;*/
+            entt::entity newEntity = scene.instantiate(*prefabResource);
+            GameObject& gameObject = scene.registry.get<GameObject>(newEntity);
+            //gameObject.scale = vec3(0.0075f);
+            gameObject.scale = vec3(1.0f);
+            gameObject.position = vec3(0.0f, 0.0f, -5.0f);
+            gameObject.rotation.z = 1.57f;
+            gameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;
         }
 
         //entt::entity thirdEntity = asset_loading::importRootEntity_fromWholeGLB(scene, path);
-        entt::entity thirdEntity = scene.registry.create();
+        /*entt::entity thirdEntity = scene.registry.create();
         GameObject& thirdGameObject = scene.registry.emplace<GameObject>(thirdEntity, "Third");
-        scene.registry.emplace<Renderer>(thirdEntity, mesh, shader);
+        scene.registry.emplace<Renderer>(thirdEntity, mesh, material);
         game_object_system::setParent(scene, thirdEntity, secondEntity);
         thirdGameObject.scale = vec3(0.5f);
-        thirdGameObject.position = vec3(1.0f, 0.0f, 0.0f);
+        thirdGameObject.position = vec3(1.0f, 0.0f, 0.0f);*/
     }
 
     void App::update(float deltaTime){
         game_object_system::debugUpdate(scene.registry, deltaTime);
         game_object_system::prerender(scene);
 
-        render_system::render(scene, resources.meshes, resources.shaders, window.getAspectRatio());
+        render_system::render(scene, window.getAspectRatio());
     }
 }

@@ -16,6 +16,7 @@ namespace engine{
 
     Window::~Window(){
         glfwDestroyWindow(glfwWindow);
+        glfwTerminate();
     }
 
     bool Window::isRunning(){

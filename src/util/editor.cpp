@@ -62,6 +62,13 @@ namespace engine{
                     if(ImGui::Button("Add Component")){
                         // TODO
                     }
+
+                    ImGui::Separator();
+
+                    if(ImGui::Button("Destroy")){
+                        game_object_system::destroy(scene, selectedEntity);
+                        selectedEntity = entt::null;
+                    }
                 }
 
                 ImGui::End();

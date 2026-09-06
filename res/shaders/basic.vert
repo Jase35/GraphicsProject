@@ -16,7 +16,8 @@ layout (std140, binding = 0) uniform CameraBuffer{
 
 struct InstanceData{
     mat4 modelMatrix;
-    mat4 normalMatrix;
+    vec4 normalMatrix[3];
+    vec4 padding;
 };
 
 layout (std430, binding = 0) readonly buffer InstanceBuffer{
@@ -27,8 +28,11 @@ layout (std430, binding = 1) readonly buffer BoneBuffer{
     mat4 matrices[];
 }bones;
 
+layout (location = 0) uniform uint instanceOffset;
+
 void main(){
     mat4 globalModel;
+    uint instance = instanceOffset + uint(gl_InstanceID);
 
     if(boneWeights.x + boneWeights.y + boneWeights.z + boneWeights.w > 0.001){
         globalModel = (
@@ -39,8 +43,12 @@ void main(){
         );
         fragNormal = normalize(mat3(globalModel) * normal);
     }else{
-        globalModel = instances[gl_InstanceID].modelMatrix;
-        fragNormal = normalize(mat3(instances[gl_InstanceID].normalMatrix) * normal);
+        globalModel = instances[instance].modelMatrix;
+        fragNormal = normalize(mat3(
+            instances[instance].normalMatrix[0].xyz,
+            instances[instance].normalMatrix[1].xyz,
+            instances[instance].normalMatrix[2].xyz
+        ) * normal);
     }
 
     //shade = max(dot(globalNormal, normalize(vec3(1.0, 0.5, 2.5))), 0.0);

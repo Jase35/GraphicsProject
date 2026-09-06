@@ -3,7 +3,8 @@ build/obj/core/app.o: src/core/app.cpp src/core/app.hpp include/glad/gl.h \
  src/core/ecs_manager.hpp src/components/game_object.hpp \
  src/components/camera.hpp src/components/renderer.hpp \
  src/composites/mesh.hpp src/composites/vertex.hpp \
- src/composites/shader.hpp src/util/resource_pool.hpp src/core/window.hpp \
+ src/composites/material.hpp src/util/resource_pool.hpp \
+ src/composites/shader.hpp src/util/image.hpp src/core/window.hpp \
  src/util/editor.hpp libs/imgui-master/imgui.h \
  libs/imgui-master/imconfig.h \
  libs/imgui-master/backends/imgui_impl_glfw.h \
@@ -24,8 +25,10 @@ src/components/camera.hpp:
 src/components/renderer.hpp:
 src/composites/mesh.hpp:
 src/composites/vertex.hpp:
-src/composites/shader.hpp:
+src/composites/material.hpp:
 src/util/resource_pool.hpp:
+src/composites/shader.hpp:
+src/util/image.hpp:
 src/core/window.hpp:
 src/util/editor.hpp:
 libs/imgui-master/imgui.h:

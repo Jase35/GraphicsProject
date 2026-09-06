@@ -19,21 +19,34 @@ namespace engine{
         glShaderSource(fragmentShader, 1, &fragmentShaderCode, NULL);
         glCompileShader(fragmentShader);
 
-        shaderId = glCreateProgram();
-        glAttachShader(shaderId, vertexShader);
-        glAttachShader(shaderId, fragmentShader);
-        glLinkProgram(shaderId);
+        shaderGLId = glCreateProgram();
+        glAttachShader(shaderGLId, vertexShader);
+        glAttachShader(shaderGLId, fragmentShader);
+        glLinkProgram(shaderGLId);
 
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
     }
 
     Shader::~Shader(){
-        // TODO
+        glDeleteProgram(shaderGLId);
+    }
+
+    Shader::Shader(Shader&& other) noexcept : shaderGLId(other.shaderGLId){
+        other.shaderGLId = 0;
+    }
+
+    Shader& Shader::operator=(Shader&& other) noexcept{
+        if(this != &other){
+            glDeleteProgram(shaderGLId);
+            shaderGLId = other.shaderGLId;
+            other.shaderGLId = 0;
+        }
+        return *this;
     }
 
     void Shader::bind() const{
-        glUseProgram(shaderId);
+        glUseProgram(shaderGLId);
     }
 
     std::string Shader::readFile(const std::filesystem::path& path){
