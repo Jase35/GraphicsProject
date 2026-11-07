@@ -5,8 +5,8 @@ build/obj/core/main.o: src/core/main.cpp src/core/app.hpp \
  src/components/renderer.hpp src/composites/mesh.hpp \
  src/composites/vertex.hpp src/composites/material.hpp \
  src/util/resource_pool.hpp src/composites/shader.hpp src/util/image.hpp \
- src/core/window.hpp src/util/editor.hpp libs/imgui-master/imgui.h \
- libs/imgui-master/imconfig.h \
+ src/core/window.hpp src/core/input.hpp src/util/editor.hpp \
+ libs/imgui-master/imgui.h libs/imgui-master/imconfig.h \
  libs/imgui-master/backends/imgui_impl_glfw.h \
  libs/imgui-master/backends/imgui_impl_opengl3.h src/util/debug.hpp \
  src/util/asset_loading.hpp libs/fastgltf-main/include/fastgltf/core.hpp \
@@ -30,6 +30,7 @@ src/util/resource_pool.hpp:
 src/composites/shader.hpp:
 src/util/image.hpp:
 src/core/window.hpp:
+src/core/input.hpp:
 src/util/editor.hpp:
 libs/imgui-master/imgui.h:
 libs/imgui-master/imconfig.h:

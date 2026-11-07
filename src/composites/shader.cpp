@@ -1,12 +1,28 @@
 #include "shader.hpp"
 
 namespace engine{
+    std::string readFile(const std::filesystem::path& path){
+        std::ifstream f(path.string(), std::ios::in | std::ios::binary);
+        if(!f) throw std::runtime_error("Failed to open " + path.string());
+        std::ostringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    }
+
     Shader::Shader(
         const std::filesystem::path& vertPath,
         const std::filesystem::path& fragPath
     ){
-        std::string vertexShaderSource = readFile(vertPath);
-        std::string fragmentShaderSource = readFile(fragPath);
+        std::string vertexShaderSource = readFile(
+            std::filesystem::current_path() / "res" / "shaders" / "common" / "raytracing.glsl"
+        ) + readFile(vertPath);
+
+        std::string fragmentShaderSource = readFile(
+            std::filesystem::current_path() / "res" / "shaders" / "common" / "raytracing.glsl"
+        ) + readFile(fragPath);
+
+        //printf(("\nVERTEX:\n" + vertexShaderSource + "\n\n").c_str());
+        //printf(("\nFRAGMENT:\n" + fragmentShaderSource + "\n").c_str());
 
         const GLchar* vertexShaderCode = vertexShaderSource.c_str();
         const GLchar* fragmentShaderCode = fragmentShaderSource.c_str();
@@ -47,13 +63,5 @@ namespace engine{
 
     void Shader::bind() const{
         glUseProgram(shaderGLId);
-    }
-
-    std::string Shader::readFile(const std::filesystem::path& path){
-        std::ifstream f(path.string(), std::ios::in | std::ios::binary);
-        if(!f) throw std::runtime_error("Failed to open " + path.string());
-        std::ostringstream ss;
-        ss << f.rdbuf();
-        return ss.str();
     }
 }

@@ -1,7 +1,7 @@
 #include "app.hpp"
 
 namespace engine{
-    App::App(std::string appName, const bool editorOpen, const bool titleDebug) : appName(appName), editorOpen(editorOpen), titleDebug(titleDebug) {}
+    App::App(std::string appName, const bool editorOpen, const bool titleDebug, const bool oneFrame) : appName(appName), editorOpen(editorOpen), titleDebug(titleDebug), oneFrame(oneFrame) {}
 
     int App::run(){
         if(!gladLoadGL((GLADloadfunc)glfwGetProcAddress)){
@@ -22,43 +22,7 @@ namespace engine{
 
         loadScene();
 
-        int ticks = 0;
-        float tickTimer = 0.0f;
-        double lastTime = glfwGetTime();
-        window.setTitle(appName);
-        while(window.isRunning()){
-            glfwPollEvents();
-
-            double currentTime = glfwGetTime();
-            float deltaTime = static_cast<float>(currentTime - lastTime);
-            if(deltaTime > MAX_FRAME_TIME){
-                // Prevent spiraling.
-                deltaTime = MAX_FRAME_TIME;
-            }
-            lastTime = currentTime;
-
-            window.check();
-
-            glClearColor(0.2f, 0.0f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            update(deltaTime);
-
-            if(editorOpen){
-                editor::update(scene);
-            }
-
-            if(titleDebug){
-                ticks++;
-                tickTimer += deltaTime;
-                if(tickTimer >= 1.0f){
-                    window.setTitle(appName + " [" + std::to_string(ticks) + " TPS]");
-                    ticks = 0;
-                    tickTimer = 0.0f;
-                }
-            }
-
-            window.swapBuffers();
-        }
+        runFrames();
 
         if(editorOpen){
             editor::shutdown();
@@ -68,6 +32,57 @@ namespace engine{
         scene.clear();
 
         return 0;
+    }
+
+    void App::runFrames(){
+        int ticks = 0;
+        float tickTimer = 0.0f;
+        double lastTime = glfwGetTime();
+        window.setTitle(appName);
+        bool firstFrame = true;
+        while(window.isRunning()){
+            glfwPollEvents();
+            bool resized = window.checkResized();
+
+            if(!oneFrame || (firstFrame || resized)){
+                float deltaTime = 0.0f;
+                if(!oneFrame){
+                    double currentTime = glfwGetTime();
+                    deltaTime = static_cast<float>(currentTime - lastTime);
+                    if(deltaTime > MAX_FRAME_TIME){
+                        // Prevent spiraling.
+                        deltaTime = MAX_FRAME_TIME;
+                    }
+                    lastTime = currentTime;
+                }
+
+                //window.check();
+
+                input::update(scene, window, deltaTime);
+
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                update(deltaTime);
+
+                if(editorOpen){
+                    editor::update(scene);
+                }
+
+                if(titleDebug){
+                    ticks++;
+                    tickTimer += deltaTime;
+                    if(tickTimer >= 1.0f){
+                        window.setTitle(appName + " [" + std::to_string(ticks) + " TPS]");
+                        ticks = 0;
+                        tickTimer = 0.0f;
+                    }
+                }
+
+                window.swapBuffers();
+
+                firstFrame = false;
+            }
+        }
     }
 
     void App::loadScene(){
@@ -80,14 +95,14 @@ namespace engine{
         ));*/
 
         Handle<Shader> shader = scene.resources.shaders.add(Shader(
-            std::filesystem::current_path() / "res" / "shaders" / "basic.vert",
-            std::filesystem::current_path() / "res" / "shaders" / "basic.frag"
+            std::filesystem::current_path() / "res" / "shaders" / "mesh.vert",
+            std::filesystem::current_path() / "res" / "shaders" / "mesh.frag"
         ));
 
         //Handle<Material> material = scene.resources.materials.add(Material(shader, vec4(1.0f, 1.0f, 1.0f, 1.0f), true, 0));
 
         Handle<Prefab> prefab = scene.resources.prefabs.add(asset_loading::importRootEntity_fromGLB(
-            std::filesystem::current_path() / "res" / "models" / "untitled.glb",
+            std::filesystem::current_path() / "res" / "models" / "miku.glb",
             scene.resources,
             shader
         ));
@@ -106,7 +121,56 @@ namespace engine{
         secondGameObject.position = vec3(0.0f, 0.0f, -5.0f);
         secondGameObject.rotation.x = 1.57f;*/
 
-        size_t ITERATIONS = 8;
+        Handle<Shader> sphereShader = scene.resources.shaders.add(
+            Shader(
+                std::filesystem::current_path() / "res" / "shaders" / "sphere.vert",
+                std::filesystem::current_path() / "res" / "shaders" / "sphere.frag"
+            )
+        );
+
+        {
+            entt::entity secondEntity = scene.registry.create();
+            GameObject& secondGameObject = scene.registry.emplace<GameObject>(secondEntity, "Sphere");
+            scene.registry.emplace<SphereRenderer>(secondEntity, scene.resources.materials.add(
+                Material(
+                    sphereShader,
+                    vec4{1.0f, 0.0f, 0.5f, 1.0f},
+                    Image{}
+                )
+            ));
+            game_object_system::setParent(scene, secondEntity, entt::null);
+            secondGameObject.position = vec3(2.0f, 1.0f, -10.0f);
+        }
+
+        {
+            entt::entity secondEntity = scene.registry.create();
+            GameObject& secondGameObject = scene.registry.emplace<GameObject>(secondEntity, "Sphere");
+            scene.registry.emplace<SphereRenderer>(secondEntity, scene.resources.materials.add(
+                Material(
+                    sphereShader,
+                    vec4{0.0f, 1.0f, 0.5f, 1.0f},
+                    Image{}
+                )
+            ));
+            game_object_system::setParent(scene, secondEntity, entt::null);
+            secondGameObject.position = vec3(-2.0f, 1.0f, -15.0f);
+        }
+
+        {
+            entt::entity secondEntity = scene.registry.create();
+            GameObject& secondGameObject = scene.registry.emplace<GameObject>(secondEntity, "Sphere");
+            scene.registry.emplace<SphereRenderer>(secondEntity, scene.resources.materials.add(
+                Material(
+                    sphereShader,
+                    vec4{0.5f, 1.0f, 0.0f, 1.0f},
+                    Image{}
+                )
+            ));
+            game_object_system::setParent(scene, secondEntity, entt::null);
+            secondGameObject.position = vec3(0.0f, 2.0f, -12.0f);
+        }
+
+        size_t ITERATIONS = 1;
         Prefab* prefabResource = scene.resources.prefabs.get(prefab);
         for(size_t i = 0; i < ITERATIONS; i++){
             /*entt::entity newEntity = scene.registry.create();
@@ -118,8 +182,8 @@ namespace engine{
             newGameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;*/
             entt::entity newEntity = scene.instantiate(*prefabResource);
             GameObject& gameObject = scene.registry.get<GameObject>(newEntity);
-            //gameObject.scale = vec3(0.0075f);
-            gameObject.scale = vec3(1.0f);
+            gameObject.scale = vec3(0.0075f);
+            //gameObject.scale = vec3(1.0f);
             gameObject.position = vec3(0.0f, 0.0f, -5.0f);
             gameObject.rotation.z = 1.57f;
             gameObject.rotation.x = (((float)i) / ITERATIONS) * 6.28f;
@@ -138,6 +202,6 @@ namespace engine{
         game_object_system::debugUpdate(scene.registry, deltaTime);
         game_object_system::prerender(scene);
 
-        render_system::render(scene, window.getAspectRatio());
+        render_system::render(scene, window.getResolution(), window.getAspectRatio());
     }
 }

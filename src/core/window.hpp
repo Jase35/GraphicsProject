@@ -4,6 +4,9 @@
 #include <stdexcept>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
+using namespace glm;
 
 namespace engine{
     class Window{
@@ -14,8 +17,9 @@ namespace engine{
         void setTitle(std::string newTitle);
         void swapBuffers();
         float getAspectRatio() const;
+        ivec2 getResolution() const;
         GLFWwindow* glfwWindow;
-        void check();
+        bool checkResized();
         
         private:
         std::string title;

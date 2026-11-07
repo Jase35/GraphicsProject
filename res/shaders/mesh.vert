@@ -1,30 +1,14 @@
-#version 430 core
-
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 layout (location = 2) in vec2 textureUV;
 layout (location = 3) in ivec4 boneIndices;
 layout (location = 4) in vec4 boneWeights;
 
+out vec3 fragPosition;
 out vec3 fragNormal;
 out vec2 fragTextureUV;
 
-layout (std140, binding = 0) uniform CameraBuffer{
-    mat4 view;
-    mat4 projection;
-}camera;
-
-struct InstanceData{
-    mat4 modelMatrix;
-    vec4 normalMatrix[3];
-    vec4 padding;
-};
-
-layout (std430, binding = 0) readonly buffer InstanceBuffer{
-    InstanceData instances[];
-};
-
-layout (std430, binding = 1) readonly buffer BoneBuffer{
+layout (std430, binding = 2) readonly buffer BoneBuffer{
     mat4 matrices[];
 }bones;
 
@@ -51,7 +35,10 @@ void main(){
         ) * normal);
     }
 
-    //shade = max(dot(globalNormal, normalize(vec3(1.0, 0.5, 2.5))), 0.0);
-    gl_Position = camera.projection * camera.view * globalModel * vec4(position, 1.0);
+    vec4 worldPosition = globalModel * vec4(position, 1.0);
+
+    gl_Position = camera.projection * camera.view * worldPosition;
+    fragPosition = worldPosition.xyz / worldPosition.w;
+
     fragTextureUV = textureUV;
 }

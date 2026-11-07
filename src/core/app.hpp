@@ -9,6 +9,7 @@
 
 #include "ecs_manager.hpp"
 #include "window.hpp"
+#include "input.hpp"
 #include "util/editor.hpp"
 #include "components/game_object.hpp"
 #include "components/camera.hpp"
@@ -22,15 +23,17 @@ namespace engine{
         static constexpr int DEFAULT_WIDTH = 1280;
         static constexpr int DEFAULT_HEIGHT = 720;
         static constexpr float MAX_FRAME_TIME = 0.5f;
-        App(std::string appName, const bool editorOpen, const bool titleDebug);
+        App(std::string appName, const bool editorOpen, const bool titleDebug, const bool oneFrame);
         int run();
         void update(float deltaTime);
         void loadScene();
 
         private:
+        void runFrames();
         std::string appName;
         bool editorOpen;
         bool titleDebug;
+        bool oneFrame;
         Scene scene;
         //entt::registry registry;
         //entt::entity firstRoot = entt::null; // First among equals (in depth).

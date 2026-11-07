@@ -34,6 +34,7 @@ namespace engine{
                 index = static_cast<uint16_t>(slots.size());
                 slots.push_back({std::move(resource), 0, true});
             }
+            currentRevision++;
             return { index, slots[index].generation };
         }
 
@@ -65,12 +66,22 @@ namespace engine{
                 slots[h.index].alive = false;
                 slots[h.index].generation++;
                 freeList.push_back(h.index);
+                currentRevision++;
             }
         }
 
         void clear(){
             slots.clear();
             freeList.clear();
+            currentRevision++;
+        }
+
+        size_t size() const{
+            return slots.size();
+        }
+
+        uint32_t revision() const{
+            return currentRevision;
         }
 
         private:
@@ -81,5 +92,6 @@ namespace engine{
         };
         std::vector<Slot> slots;
         std::vector<uint16_t> freeList;
+        uint32_t currentRevision = 0;
     };
 }

@@ -73,10 +73,10 @@ namespace engine{
     }
 
     void Material::bind() const{
-        glUniform4fv(1, 1, &baseColor[0]);
-        glUniform1i(2, textureGLId != 0);
+        glUniform4fv(2, 1, &baseColor[0]);
+        glUniform1i(3, textureGLId != 0);
         if(textureGLId != 0){
-            glActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, textureGLId);
         }
     }

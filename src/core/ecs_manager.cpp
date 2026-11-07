@@ -7,13 +7,6 @@ namespace engine{
         }
         
         void initializeComponents(){
-            entt::meta_factory<GameObject>()
-                .type("Game Object")
-                .data<&GameObject::name>("Name")
-                .data<&GameObject::active>("Active")
-                .data<&GameObject::position>("Position")
-                .data<&GameObject::rotation>("Rotation")
-                .data<&GameObject::scale>("Scale");
         }
     }
 }

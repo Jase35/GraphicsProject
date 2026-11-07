@@ -33,14 +33,27 @@ namespace engine{
     }
 
     float Window::getAspectRatio() const {
-        int actualWidth, actualHeight;
-        glfwGetWindowSize(glfwWindow, &actualWidth, &actualHeight);
-        return ((float)actualWidth) / ((float)actualHeight);
+        ivec2 res = getResolution();
+        return ((float)res.x) / ((float)res.y);
     }
 
-    void Window::check(){
+    ivec2 Window::getResolution() const {
+        return ivec2(width, height);
+    }
+
+    bool Window::checkResized(){
         int actualWidth, actualHeight;
         glfwGetWindowSize(glfwWindow, &actualWidth, &actualHeight);
+        bool result = false;
+        if(width != actualWidth){
+            width = actualWidth;
+            result = true;
+        }
+        if(height != actualHeight){
+            height = actualHeight;
+            result = true;
+        }
         glViewport(0, 0, actualWidth, actualHeight);
+        return result;
     }
 }
