@@ -1,4 +1,4 @@
-in vec2 fragOffset;
+sample in vec2 fragOffset;
 flat in uint sphereIndex;
 
 out vec4 FragColor;

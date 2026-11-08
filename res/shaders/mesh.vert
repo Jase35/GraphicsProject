@@ -4,9 +4,9 @@ layout (location = 2) in vec2 textureUV;
 layout (location = 3) in ivec4 boneIndices;
 layout (location = 4) in vec4 boneWeights;
 
-out vec3 fragPosition;
-out vec3 fragNormal;
-out vec2 fragTextureUV;
+sample out vec3 fragPosition;
+sample out vec3 fragNormal;
+sample out vec2 fragTextureUV;
 
 layout (std430, binding = 2) readonly buffer BoneBuffer{
     mat4 matrices[];

@@ -11,6 +11,8 @@ using namespace glm;
 namespace engine{
     class Window{
         public:
+        static constexpr int MSAA_SAMPLES = 4;
+
         Window(std::string title, int width, int height);
         ~Window();
         bool isRunning();

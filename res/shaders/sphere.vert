@@ -1,6 +1,6 @@
 layout (location = 0) uniform uint instanceOffset;
 
-out vec2 fragOffset;
+sample out vec2 fragOffset;
 flat out uint sphereIndex;
 
 void main(){

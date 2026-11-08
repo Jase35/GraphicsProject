@@ -13,6 +13,7 @@ namespace engine{
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glFrontFace(GL_CCW);
+        glEnable(GL_MULTISAMPLE);
 
         if(editorOpen){
             editor::initialize(window);

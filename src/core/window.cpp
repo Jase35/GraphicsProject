@@ -5,6 +5,8 @@ namespace engine{
         if(!glfwInit()){
             throw std::runtime_error("Failed to initialize GLFW.");
         }
+
+        glfwWindowHint(GLFW_SAMPLES, MSAA_SAMPLES);
         
         glfwWindow = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         if(!glfwWindow){
