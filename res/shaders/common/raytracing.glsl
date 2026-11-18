@@ -1,4 +1,5 @@
 #version 430 core
+#extension GL_ARB_bindless_texture : require
 
 #define MATERIAL_DIFFUSE    0
 #define MATERIAL_SPECULAR   1
@@ -22,23 +23,20 @@ layout (std140, binding = 1) uniform CameraBuffer{
 }camera;
 
 struct GPUVertex{
-    vec4 position;
-    vec4 normal;
-    //vec2 uv;
-    //uint materialIndex;
+    vec4 position; // w = uv.x
+    vec4 normal; // w = uv.y
 };
 
 struct GPUSphere{
-    vec4 baseColor; // TODO remove.
     vec3 position;
     float diameter;
-    //uint materialIndex;
+    uint materialIndex;
 };
 
 struct GPUMaterial{
     vec4 baseColor;
     int type; // Material definitions.
-    sampler2D colorTexture;
+    sampler2D colorTexture; // Bindless handle. 0 when there is no texture.
 };
 
 struct InstanceData{
@@ -48,6 +46,7 @@ struct InstanceData{
     uvec4 geometry;
     vec4 boundMin;
     vec4 boundMax;
+    uvec4 material; // x = material index.
 };
 
 struct BVHNode{
@@ -84,6 +83,22 @@ layout (std430, binding = 7) readonly buffer MaterialBuffer{
 /*layout (std430, binding = 6) readonly buffer InstanceBuffer{
     GPUInstace instances[];
 };*/
+
+vec4 materialColor(uint materialIndex, vec2 uv, vec2 uvDx, vec2 uvDy){
+    vec4 color = materials[materialIndex].baseColor;
+    if(uvec2(materials[materialIndex].colorTexture) != uvec2(0u)){
+        color *= textureGrad(materials[materialIndex].colorTexture, uv, uvDx, uvDy);
+    }
+    return color;
+}
+
+vec2 sphereUV(vec3 normal){
+    const float PI = 3.14159265358979323846;
+    return vec2(
+        0.5 + (atan(normal.z, normal.x) / (2.0 * PI)),
+        0.5 - (asin(clamp(normal.y, -1.0, 1.0)) / PI)
+    );
+}
 
 struct Ray{
     vec3 origin;
@@ -186,6 +201,7 @@ vec4 castRay(vec2 coord, vec4 startColor, vec3 startPosition, vec3 startNormal){
         int sphereIndex = -1;
         int triangleIndex = -1;
         vec3 triangleNormal = vec3(0.0);
+        vec2 triangleUV = vec2(0.0);
 
         Ray worldRay = createRay(currentOrigin, currentDirection);
 
@@ -256,6 +272,11 @@ vec4 castRay(vec2 coord, vec4 startColor, vec3 startPosition, vec3 startNormal){
                     );
                     vec3 norm = normalize(normalMatrix * cross(v0v1, v0v2));
                     triangleNormal = det < 0.0 ? -norm : norm;
+
+                    vec2 uv0 = vec2(vertices[vertexOffset + indices[can]].position.w, vertices[vertexOffset + indices[can]].normal.w);
+                    vec2 uv1 = vec2(vertices[vertexOffset + indices[can + 1u]].position.w, vertices[vertexOffset + indices[can + 1u]].normal.w);
+                    vec2 uv2 = vec2(vertices[vertexOffset + indices[can + 2u]].position.w, vertices[vertexOffset + indices[can + 2u]].normal.w);
+                    triangleUV = (uv0 * (1.0 - u - v)) + (uv1 * u) + (uv2 * v);
                 }
             }
         }
@@ -293,14 +314,14 @@ vec4 castRay(vec2 coord, vec4 startColor, vec3 startPosition, vec3 startNormal){
         if(triangleIndex >= 0){
             currentSurfaceNormal = triangleNormal;
 
-            result.rgb *= vec3(0.9); // For testing.
+            result.rgb *= materialColor(instances[triangleIndex].material.x, triangleUV, vec2(0.0), vec2(0.0)).rgb;
         }else if(sphereIndex >= 0){
             GPUSphere sphere = spheres[sphereIndex];
 
             vec3 hitNormal = normalize(currentOrigin - sphere.position);
             currentSurfaceNormal = hitNormal;
 
-            result.rgb *= sphere.baseColor.rgb; // TODO change to actual color.
+            result.rgb *= materialColor(sphere.materialIndex, sphereUV(hitNormal), vec2(0.0), vec2(0.0)).rgb;
         }else{
             break;
         }

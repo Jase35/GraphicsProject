@@ -5,6 +5,16 @@
 #include <stb/stb_image.h>
 
 namespace asset_loading{
+    Image importImage(const std::filesystem::path& path){
+        int width, height, channels;
+        unsigned char* data = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+        if(!data){
+            printf("Failed to load image: %s\n", path.string().c_str());
+            return {};
+        }
+        return Image(width, height, data);
+    }
+
     Prefab importRootEntity_fromGLB(
         const std::filesystem::path& path,
         Resources& resources,

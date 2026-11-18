@@ -9,6 +9,11 @@ namespace engine{
             return -1;
         }
 
+        if(!loadBindlessTextureFunctions()){
+            printf("GL_ARB_bindless_texture is not supported.\n");
+            return -1;
+        }
+
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
@@ -140,8 +145,10 @@ namespace engine{
             scene.registry.emplace<SphereRenderer>(secondEntity, scene.resources.materials.add(
                 Material(
                     sphereShader,
-                    vec4{1.0f, 0.0f, 0.5f, 1.0f},
-                    Image{}
+                    vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                    asset_loading::importImage(
+                        std::filesystem::current_path() / "res" / "textures" / "tree.jpg"
+                    )
                 )
             ));
             game_object_system::setParent(scene, secondEntity, entt::null);

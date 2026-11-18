@@ -7,14 +7,44 @@ namespace engine{
             vec3 centroid;
             vec3 boundMin, boundMax;
         };
+        
+        constexpr uint32_t BVH_PARALLEL_MIN_TRIANGLES = 4096;
+        constexpr uint32_t BVH_PARALLEL_MIN_CHUNK = 16384;
 
-        void buildNode(
-            std::vector<BVHNode>& nodes,
+        uint32_t workerCount(){
+            const uint32_t hardware = std::thread::hardware_concurrency();
+            return (hardware == 0) ? 1 : hardware;
+        }
+
+        template<typename Function>
+        void parallelFor(uint32_t count, Function&& function){
+            const uint32_t threadCount = std::min(workerCount(), std::max(1u, count / BVH_PARALLEL_MIN_CHUNK));
+            if(threadCount <= 1){
+                function(0u, count);
+                return;
+            }
+
+            std::vector<std::thread> threads;
+            threads.reserve(threadCount - 1);
+            const uint32_t chunk = (count + threadCount - 1) / threadCount;
+            for(uint32_t t = 1; t < threadCount; t++){
+                const uint32_t begin = std::min(count, t * chunk);
+                const uint32_t end = std::min(count, begin + chunk);
+                threads.emplace_back([&function, begin, end](){ function(begin, end); });
+            }
+            function(0u, std::min(count, chunk));
+            for(std::thread& thread : threads){
+                thread.join();
+            }
+        }
+
+        bool prepareNode(
+            BVHNode& node,
             std::vector<BuildTriangle>& triangles,
-            uint32_t nodeIndex,
             uint32_t first,
             uint32_t count,
-            uint32_t depth
+            uint32_t depth,
+            uint32_t& mid
         ){
             vec3 boundMin(std::numeric_limits<float>::max());
             vec3 boundMax(std::numeric_limits<float>::lowest());
@@ -30,8 +60,8 @@ namespace engine{
                 centroidMax = glm::max(centroidMax, triangle.centroid);
             }
 
-            nodes[nodeIndex].boundMin = boundMin;
-            nodes[nodeIndex].boundMax = boundMax;
+            node.boundMin = boundMin;
+            node.boundMax = boundMax;
 
             const vec3 extent = centroidMax - centroidMin;
             const int axis = extent.x > extent.y
@@ -39,12 +69,12 @@ namespace engine{
                 : (extent.y > extent.z ? 1 : 2);
 
             if(count <= BVH_LEAF_SIZE || depth >= BVH_MAX_DEPTH || extent[axis] <= 0.0f){
-                nodes[nodeIndex].leftOrStart = first;
-                nodes[nodeIndex].count = count;
-                return;
+                node.leftOrStart = first;
+                node.count = count;
+                return false;
             }
 
-            const uint32_t mid = first + (count / 2);
+            mid = first + (count / 2);
             std::nth_element(
                 triangles.begin() + first,
                 triangles.begin() + mid,
@@ -53,6 +83,21 @@ namespace engine{
                     return left.centroid[axis] < right.centroid[axis];
                 }
             );
+            return true;
+        }
+
+        void buildNode(
+            std::vector<BVHNode>& nodes,
+            std::vector<BuildTriangle>& triangles,
+            uint32_t nodeIndex,
+            uint32_t first,
+            uint32_t count,
+            uint32_t depth
+        ){
+            uint32_t mid = 0;
+            if(!prepareNode(nodes[nodeIndex], triangles, first, count, depth, mid)){
+                return;
+            }
 
             const uint32_t left = static_cast<uint32_t>(nodes.size());
             nodes.resize(left + 2);
@@ -61,6 +106,65 @@ namespace engine{
 
             buildNode(nodes, triangles, left, first, mid - first, depth + 1);
             buildNode(nodes, triangles, left + 1, mid, first + count - mid, depth + 1);
+        }
+
+        void spliceSubtree(std::vector<BVHNode>& nodes, uint32_t rootIndex, const std::vector<BVHNode>& subtree){
+            const uint32_t base = static_cast<uint32_t>(nodes.size()) - 1; // Local index 1 maps to nodes.size().
+            auto rebase = [base](BVHNode node){
+                if(node.count == 0){
+                    node.leftOrStart += base;
+                }
+                return node;
+            };
+
+            nodes[rootIndex] = rebase(subtree[0]);
+            for(size_t i = 1; i < subtree.size(); i++){
+                nodes.push_back(rebase(subtree[i]));
+            }
+        }
+
+        void buildNodeParallel(
+            std::vector<BVHNode>& nodes,
+            std::vector<BuildTriangle>& triangles,
+            uint32_t nodeIndex,
+            uint32_t first,
+            uint32_t count,
+            uint32_t depth,
+            uint32_t threadBudget
+        ){
+            if(threadBudget <= 1 || count < BVH_PARALLEL_MIN_TRIANGLES){
+                buildNode(nodes, triangles, nodeIndex, first, count, depth);
+                return;
+            }
+
+            uint32_t mid = 0;
+            if(!prepareNode(nodes[nodeIndex], triangles, first, count, depth, mid)){
+                return;
+            }
+
+            const uint32_t left = static_cast<uint32_t>(nodes.size());
+            nodes.resize(left + 2);
+            nodes[nodeIndex].leftOrStart = left;
+            nodes[nodeIndex].count = 0;
+
+            const uint32_t leftCount = mid - first;
+            const uint32_t rightCount = first + count - mid;
+            const uint32_t leftBudget = threadBudget / 2;
+            const uint32_t rightBudget = threadBudget - leftBudget;
+
+            std::vector<BVHNode> leftNodes(1);
+            std::vector<BVHNode> rightNodes(1);
+            leftNodes.reserve(2 * leftCount);
+            rightNodes.reserve(2 * rightCount);
+
+            std::thread leftThread([&](){
+                buildNodeParallel(leftNodes, triangles, 0, first, leftCount, depth + 1, leftBudget);
+            });
+            buildNodeParallel(rightNodes, triangles, 0, mid, rightCount, depth + 1, rightBudget);
+            leftThread.join();
+
+            spliceSubtree(nodes, left, leftNodes);
+            spliceSubtree(nodes, left + 1, rightNodes);
         }
     }
 
@@ -192,33 +296,42 @@ namespace engine{
         }
 
         std::vector<BuildTriangle> triangles(triangleCount);
-        for(uint32_t i = 0; i < triangleCount; i++){
-            BuildTriangle& triangle = triangles[i];
-            triangle.i0 = indices[i * 3];
-            triangle.i1 = indices[(i * 3) + 1];
-            triangle.i2 = indices[(i * 3) + 2];
+        std::atomic<bool> invalidIndex{false};
+        parallelFor(triangleCount, [&](uint32_t begin, uint32_t end){
+            for(uint32_t i = begin; i < end; i++){
+                BuildTriangle& triangle = triangles[i];
+                triangle.i0 = indices[i * 3];
+                triangle.i1 = indices[(i * 3) + 1];
+                triangle.i2 = indices[(i * 3) + 2];
 
-            if(triangle.i0 >= vertices.size() || triangle.i1 >= vertices.size() || triangle.i2 >= vertices.size()){
-                return;
+                if(triangle.i0 >= vertices.size() || triangle.i1 >= vertices.size() || triangle.i2 >= vertices.size()){
+                    invalidIndex.store(true, std::memory_order_relaxed);
+                    return;
+                }
+
+                const vec3 p0 = vertices[triangle.i0].position;
+                const vec3 p1 = vertices[triangle.i1].position;
+                const vec3 p2 = vertices[triangle.i2].position;
+
+                triangle.boundMin = glm::min(p0, glm::min(p1, p2));
+                triangle.boundMax = glm::max(p0, glm::max(p1, p2));
+                triangle.centroid = (p0 + p1 + p2) / 3.0f;
             }
-
-            const vec3 p0 = vertices[triangle.i0].position;
-            const vec3 p1 = vertices[triangle.i1].position;
-            const vec3 p2 = vertices[triangle.i2].position;
-
-            triangle.boundMin = glm::min(p0, glm::min(p1, p2));
-            triangle.boundMax = glm::max(p0, glm::max(p1, p2));
-            triangle.centroid = (p0 + p1 + p2) / 3.0f;
+        });
+        if(invalidIndex.load()){
+            return;
         }
 
         nodes.reserve(2 * triangleCount);
         nodes.resize(1);
-        buildNode(nodes, triangles, 0, 0, triangleCount, 0);
+        buildNodeParallel(nodes, triangles, 0, 0, triangleCount, 0, workerCount());
 
-        for(uint32_t i = 0; i < triangleCount; i++){
-            indices[i * 3] = triangles[i].i0;
-            indices[(i * 3) + 1] = triangles[i].i1;
-            indices[(i * 3) + 2] = triangles[i].i2;
-        }
+        parallelFor(triangleCount, [&](uint32_t begin, uint32_t end){
+            for(uint32_t i = begin; i < end; i++){
+                indices[i * 3] = triangles[i].i0;
+                indices[(i * 3) + 1] = triangles[i].i1;
+                indices[(i * 3) + 2] = triangles[i].i2;
+            }
+        });
     }
 }

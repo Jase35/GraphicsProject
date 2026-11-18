@@ -18,11 +18,14 @@ namespace engine{
             GLuint indicesSSBO = 0;
             GLuint BVHNodesSSBO = 0;
             GLuint spheresSSBO = 0;
+            GLuint materialsSSBO = 0;
             GLuint spheresVAO = 0;
             size_t instanceCapacity = 0;
             size_t sphereCapacity = 0;
+            size_t materialCapacity = 0;
             std::vector<InstanceData> instancesData;
             std::vector<GPUSphere> spheresData;
+            std::vector<GPUMaterial> materialsData;
 
             struct SphereBatch{
                 uint16_t materialId = 0;
@@ -109,6 +112,43 @@ namespace engine{
                 );
             }
 
+            void uploadMaterials(Resources& resources){
+                const size_t materialCount = resources.materials.size();
+                materialsData.assign(materialCount, GPUMaterial{vec4(1.0f), 0, 0, 0});
+
+                for(size_t i = 0; i < materialCount; i++){
+                    const Material* material = resources.materials.get(static_cast<uint16_t>(i));
+                    if(material == nullptr){
+                        continue;
+                    }
+
+                    GPUMaterial& gpuMaterial = materialsData[i];
+                    gpuMaterial.baseColor = material->baseColor;
+                    gpuMaterial.type = static_cast<int32_t>(material->type);
+                    gpuMaterial.colorTexture = material->textureHandle;
+                }
+
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, materialsSSBO);
+                if(materialsData.size() > materialCapacity){
+                    materialCapacity = materialsData.size();
+                    glBufferData(
+                        GL_SHADER_STORAGE_BUFFER,
+                        materialCapacity * sizeof(GPUMaterial),
+                        NULL,
+                        GL_DYNAMIC_DRAW
+                    );
+                }
+                if(!materialsData.empty()){
+                    glBufferSubData(
+                        GL_SHADER_STORAGE_BUFFER,
+                        0,
+                        materialsData.size() * sizeof(GPUMaterial),
+                        materialsData.data()
+                    );
+                }
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materialsSSBO);
+            }
+
             void uploadSpheres(Scene& scene){
                 spheresData.clear();
                 sphereEntries.clear();
@@ -133,7 +173,7 @@ namespace engine{
 
                     sphereEntries.push_back({
                         sphereRenderer.material.index,
-                        {material->baseColor, vec3(transform[3]), 2.0f * radius}
+                        {vec3(transform[3]), 2.0f * radius, sphereRenderer.material.index, {0, 0, 0}}
                     });
                 }
 
@@ -196,7 +236,6 @@ namespace engine{
                         shader->bind();
                         lastShaderId = material->shader.index;
                     }
-                    material->bind();
 
                     glUniform1ui(INSTANCE_OFFSET_LOCATION, batch.first);
                     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(batch.count));
@@ -316,6 +355,7 @@ namespace engine{
                 glGenBuffers(1, &verticesSSBO);
                 glGenBuffers(1, &indicesSSBO);
                 glGenBuffers(1, &spheresSSBO);
+                glGenBuffers(1, &materialsSSBO);
                 glGenBuffers(1, &BVHNodesSSBO);
                 glGenVertexArrays(1, &spheresVAO);
             }
@@ -347,6 +387,7 @@ namespace engine{
 
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, BVHNodesSSBO);
 
+            uploadMaterials(scene.resources);
             uploadSpheres(scene);
 
             const uint32_t sphereCount = static_cast<uint32_t>(spheresData.size());
@@ -372,6 +413,7 @@ namespace engine{
                 instance.normalMatrix[2] = vec4(cross(col0, col1) * inverseDeterminant, 0.0f);
 
                 const uint16_t meshId = static_cast<uint16_t>(sortedKeys[i] >> 8);
+                instance.material = uvec4(static_cast<uint16_t>(sortedKeys[i] >> 24), 0u, 0u, 0u);
                 if(meshId < meshRanges.size()){
                     const GeometryRange& range = meshRanges[meshId];
                     instance.geometry = uvec4(range.vertexOffset, range.indexOffset, range.triangleCount, range.nodeOffset);
@@ -439,12 +481,10 @@ namespace engine{
                 }
 
                 if(materialId != lastMaterialId){
-                    Material* material = scene.resources.materials.get(materialId);
-                    if(material == nullptr){
+                    if(scene.resources.materials.get(materialId) == nullptr){
                         start = end;
                         continue;
                     }
-                    material->bind();
                     
                     lastMaterialId = materialId;
                 }
@@ -487,6 +527,7 @@ namespace engine{
             glDeleteBuffers(1, &verticesSSBO);
             glDeleteBuffers(1, &indicesSSBO);
             glDeleteBuffers(1, &spheresSSBO);
+            glDeleteBuffers(1, &materialsSSBO);
             glDeleteBuffers(1, &BVHNodesSSBO);
             glDeleteVertexArrays(1, &spheresVAO);
             resolutionUBO = 0;
@@ -496,14 +537,18 @@ namespace engine{
             verticesSSBO = 0;
             indicesSSBO = 0;
             spheresSSBO = 0;
+            materialsSSBO = 0;
             BVHNodesSSBO = 0;
             spheresVAO = 0;
             instanceCapacity = 0;
             sphereCapacity = 0;
+            materialCapacity = 0;
             instancesData.clear();
             instancesData.shrink_to_fit();
             spheresData.clear();
             spheresData.shrink_to_fit();
+            materialsData.clear();
+            materialsData.shrink_to_fit();
             sphereEntries.clear();
             sphereEntries.shrink_to_fit();
             sphereBatches.clear();

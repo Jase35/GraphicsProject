@@ -29,6 +29,7 @@ namespace engine{
         uvec4 geometry;
         vec4 boundMin;
         vec4 boundMax;
+        uvec4 material; // x is material index.
     };
 
     struct GPUVertex{
@@ -37,10 +38,21 @@ namespace engine{
     };
 
     struct GPUSphere{
-        vec4 baseColor;
         vec3 position;
         float diameter;
+        uint32_t materialIndex;
+        uint32_t padding[3];
     };
+
+    struct GPUMaterial{
+        vec4 baseColor;
+        int32_t type;
+        int32_t padding;
+        GLuint64 colorTexture;
+    };
+    
+    static_assert(sizeof(GPUSphere) == 32);
+    static_assert(sizeof(GPUMaterial) == 32);
     
     inline constexpr GLint INSTANCE_OFFSET_LOCATION = 0;
     inline constexpr size_t MAX_BONES = 128;

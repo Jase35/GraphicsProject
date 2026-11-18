@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <limits>
 #include <string>
+#include <atomic>
+#include <thread>
 
 #include "composites/vertex.hpp"
 

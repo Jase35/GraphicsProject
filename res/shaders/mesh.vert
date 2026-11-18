@@ -7,6 +7,7 @@ layout (location = 4) in vec4 boneWeights;
 sample out vec3 fragPosition;
 sample out vec3 fragNormal;
 sample out vec2 fragTextureUV;
+flat out uint fragInstance;
 
 layout (std430, binding = 2) readonly buffer BoneBuffer{
     mat4 matrices[];
@@ -41,4 +42,5 @@ void main(){
     fragPosition = worldPosition.xyz / worldPosition.w;
 
     fragTextureUV = textureUV;
+    fragInstance = instance;
 }

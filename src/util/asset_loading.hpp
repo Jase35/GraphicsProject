@@ -25,5 +25,7 @@ namespace asset_loading{
 
     Mesh importMesh_fromFirstGLB(const std::filesystem::path& path);
 
+    Image importImage(const std::filesystem::path& path);
+
     vec3 quaternionToEuler(quat quaternion);
 }
