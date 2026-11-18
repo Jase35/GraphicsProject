@@ -1,5 +1,10 @@
 #version 430 core
 
+#define MATERIAL_DIFFUSE    0
+#define MATERIAL_SPECULAR   1
+#define MATERIAL_DIALECTRIC 2
+#define MATERIAL_EMISSIVE   3
+
 const int MAX_REFLECTIONS = 50;
 const int MAX_TRAVERSAL_STACK = 32;
 const float FLOAT_MAX = 3.402823466e+38;
@@ -32,6 +37,7 @@ struct GPUSphere{
 
 struct GPUMaterial{
     vec4 baseColor;
+    int type; // Material definitions.
     sampler2D colorTexture;
 };
 
@@ -71,12 +77,12 @@ layout (std430, binding = 6) readonly buffer BVHNodeBuffer{
     BVHNode bvhNodes[];
 };
 
+layout (std430, binding = 7) readonly buffer MaterialBuffer{
+    GPUMaterial materials[];
+};
+
 /*layout (std430, binding = 6) readonly buffer InstanceBuffer{
     GPUInstace instances[];
-};*/
-
-/*layout (std430, binding = 6) readonly buffer MaterialBuffer{
-    GPUMaterial materials[];
 };*/
 
 struct Ray{

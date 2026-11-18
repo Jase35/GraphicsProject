@@ -42,7 +42,12 @@ namespace engine{
         window.setTitle(appName);
         bool firstFrame = true;
         while(window.isRunning()){
-            glfwPollEvents();
+            if(!oneFrame){
+                glfwPollEvents();
+            }else{
+                glfwWaitEvents();
+            }
+            
             bool resized = window.checkResized();
 
             if(!oneFrame || (firstFrame || resized)){
